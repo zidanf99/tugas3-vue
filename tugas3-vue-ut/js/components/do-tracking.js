@@ -33,6 +33,18 @@ Vue.component('do-tracking', {
             return this.paketList.find(p => p.kode === this.formDO.paket);
         }
     },
+
+    watch: {
+        searchQuery(newValue) {
+            // Jika kotak pencarian dikosongkan secara manual (dihapus/backspace)
+            // maka kita otomatis mereset hasil pencarian di layar.
+            if (newValue === '') {
+                this.searchResult = null;
+                this.searchKey = '';
+            }
+        }
+    },
+    
     methods: {
         // Fitur Pencarian dengan Enter
         submitSearch() {

@@ -121,7 +121,7 @@ s
                 <h4>Filter & Urutkan</h4>
                 <select v-model="filterUpbjj">
                     <option value="">-- Semua UT-Daerah --</option>
-                    <option v-for="upbjj in upbjjList" :value="upbjj" :key="upbjj">{{ upbjj }}</option>
+                    <option v-for="upbjj in upbjjList" :value="upbjj" :key="upbjj">{{ c }}</option>
                 </select>
 
                 <select v-model="filterKategori" v-if="kategoriTersedia.length > 0">
