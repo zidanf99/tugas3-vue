@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>SITTA UT - Bahan Ajar</title>
+    <!-- Tambahkan CSS Anda di sini jika ada -->
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        nav button { padding: 10px 20px; margin-right: 5px; cursor: pointer; }
+        table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        /* Efek saat mouse diarahkan ke tombol (Hover) */
+        nav button:hover {
+            background-color: #e2e6ea;
+            border-color: #dae0e5;
+        }
+s
+        /* Tanda untuk menu yang sedang aktif dipilih */
+        nav button.active {
+            background-color: #007bff; /* Warna biru standar */
+            color: white;
+            font-weight: bold;
+            border: 1px solid #0056b3;
+            box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125);
+        }
+
+        /* Sedikit mempercantik tombol dasar */
+        nav button {
+            padding: 10px 20px;
+            margin-right: 8px;
+            cursor: pointer;
+            border: none;
+            color: #fff;
+            border-radius: 6px; /* Ujung tombol agak membulat */
+            transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+        }
+
+        /* Beri warna berbeda untuk tiap tombol navigasi */
+        nav button:nth-child(1) { /* Stok */
+            background: linear-gradient(135deg,#28a745,#8ce16b);
+        }
+        nav button:nth-child(2) { /* Tracking */
+            background: linear-gradient(135deg,#17a2b8,#6fd3df);
+        }
+        nav button:nth-child(3) { /* Order */
+            background: linear-gradient(135deg,#007bff,#66a3ff);
+        }
+
+        nav button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 18px rgba(0,0,0,0.12);
+            opacity: 0.95;
+        }
+        nav button:active {
+            transform: translateY(0);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.08) inset;
+        }
+        nav button:focus {
+            outline: 3px solid rgba(255,255,255,0.15);
+        }
+    </style>
+</head>
+<body>
+    <!-- ROOT VUE APP -->
+    <div id="app">
+        <h1>Sistem Pemesanan Bahan Ajar UT (SITTA)</h1>
+        
+        <!-- Navigasi Routing Sederhana -->
+        <nav style="margin-bottom: 20px;">
+            <button @click="tab = 'stok'">Stok Bahan Ajar</button>
+            <button @click="tab = 'tracking'">Tracking DO</button>
+            <button @click="tab = 'order'">Pemesanan Baru</button>
+        </nav>
+
+        <!-- AREA RENDER KOMPONEN -->
+        
+        <!-- 1. Halaman Stok -->
+        <section v-show="tab === 'stok'">
+            <ba-stock-table 
+                :items="state.stok" 
+                :upbjj-list="state.upbjjList" 
+                :kategori-list="state.kategoriList">
+            </ba-stock-table>
+        </section>
+
+        <!-- 2. Halaman Tracking DO -->
+        <section v-show="tab === 'tracking'">
+            <do-tracking 
+                :data-tracking="state.tracking" 
+                :paket-list="state.paket" 
+                :ekspedisi-list="state.pengirimanList">
+            </do-tracking>
+        </section>
+
+        <!-- 3. Halaman Pemesanan -->
+        <section v-show="tab === 'order'">
+            <order-form 
+                :paket-list="state.paket" 
+                :ekspedisi-list="state.pengirimanList"
+                @order-created="handleNewOrder"
+                @show-modal="tampilkanModal">
+            </order-form>
+        </section>
+
+        <!-- Komponen Modal Global -->
+        <app-modal ref="modalComponent"></app-modal>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- DAFTAR TEMPLATE KOMPONEN                   -->
+    <!-- ========================================== -->
+
+    <!-- Template 1: Tabel Stok -->
+    <template id="tpl-stock">
+        <div class="stok-container">
+            <h2>Daftar Stok Bahan Ajar</h2>
+            
+            <div class="filter-area" style="margin-bottom: 20px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9;">
+                <h4>Filter & Urutkan</h4>
+                <select v-model="filterUpbjj">
+                    <option value="">-- Semua UT-Daerah --</option>
+                    <option v-for="upbjj in upbjjList" :value="upbjj" :key="upbjj">{{ upbjj }}</option>
+                </select>
+
+                <select v-model="filterKategori" v-if="kategoriTersedia.length > 0">
+                    <option value="">-- Semua Kategori --</option>
+                    <option v-for="kat in kategoriTersedia" :value="kat" :key="kat">{{ kat }}</option>
+                </select>
+
+                <label style="margin-left: 10px;">
+                    <input type="checkbox" v-model="filterReorder"> Tampilkan Stok Menipis/Kosong
+                </label>
+
+                <button @click="resetFilter" style="margin-left: 10px;">Reset Filter</button>
+                <hr>
+                <button @click="setSort('judul')">Urutkan Judul</button>
+                <button @click="setSort('qty')">Urutkan Stok</button>
+                <button @click="setSort('harga')">Urutkan Harga</button>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Kode</th><th>Judul</th><th>Kategori</th><th>UPBJJ</th>
+                        <th>Rak</th><th>Harga</th><th>Qty</th><th>Safety</th>
+                        <th>Status</th><th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="item in filteredAndSortedItems" :key="item.kode">
+                        <td>{{ item.kode }}</td><td>{{ item.judul }}</td><td>{{ item.kategori }}</td>
+                        <td>{{ item.upbjj }}</td><td>{{ item.lokasiRak }}</td><td>{{ item.harga | currency }}</td>
+                        <td>{{ item.qty | satuan }}</td><td>{{ item.safety | satuan }}</td>
+                        <td @mouseenter="hoveredRow = item.kode" @mouseleave="hoveredRow = null" style="position: relative; cursor: pointer;">
+                            <span :style="{ color: cekStatus(item.qty, item.safety).color, fontWeight: 'bold' }">
+                                {{ cekStatus(item.qty, item.safety).icon }} {{ cekStatus(item.qty, item.safety).text }}
+                            </span>
+                            <div v-show="hoveredRow === item.kode && item.catatanHTML" style="position: absolute; background: #333; color: #fff; padding: 5px; border-radius: 4px; z-index: 10; top: 100%; left: 0;" v-html="item.catatanHTML"></div>
+                        </td>
+                        <td>
+                            <button @click="editItem(item)">Edit</button>
+                            <button @click="deleteItem(item.kode)">Hapus</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div style="margin-top: 30px; padding: 15px; background: #eee; border: 1px solid #ccc;">
+                <h3>{{ isEditing ? 'Edit Bahan Ajar' : 'Tambah Bahan Ajar' }}</h3>
+                <p><small>Tekan <b>Enter</b> pada input teks untuk menyimpan data.</small></p>
+                <form @submit.prevent="submitForm">
+                    <input type="text" v-model="form.kode" placeholder="Kode MK" :disabled="isEditing" required>
+                    <input type="text" v-model="form.judul" placeholder="Judul Buku" @keyup.enter="submitForm" required>
+                    <select v-model="form.kategori"><option value="">Pilih Kategori</option><option v-for="kat in kategoriList" :value="kat">{{ kat }}</option></select>
+                    <select v-model="form.upbjj"><option value="">Pilih UPBJJ</option><option v-for="upbjj in upbjjList" :value="upbjj">{{ upbjj }}</option></select>
+                    <input type="text" v-model="form.lokasiRak" placeholder="Lokasi Rak" @keyup.enter="submitForm">
+                    <input type="number" v-model="form.harga" placeholder="Harga" @keyup.enter="submitForm" required>
+                    <input type="number" v-model="form.qty" placeholder="Jumlah Stok" @keyup.enter="submitForm" required>
+                    <input type="number" v-model="form.safety" placeholder="Safety Stok" @keyup.enter="submitForm" required>
+                    <input type="text" v-model="form.catatanHTML" placeholder="Catatan (HTML)" @keyup.enter="submitForm">
+                    <button type="button" @click="submitForm">{{ isEditing ? 'Update' : 'Simpan' }}</button>
+                    <button type="button" v-if="isEditing" @click="batalEdit">Batal</button>
+                </form>
+            </div>
+        </div>
+    </template>
+
+    <!-- Template 2: Tracking DO -->
+    <template id="tpl-tracking">
+        <div class="tracking-container">
+            <h2>Tracking Delivery Order (DO)</h2>
+            <div style="background: #e8f4f8; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4>Cari Status Pengiriman</h4>
+                <input type="text" v-model="searchQuery" @keyup.enter="submitSearch" @keyup.esc="resetSearch" placeholder="Masukkan Nomor DO / NIM..." style="width: 250px; padding: 8px;">
+                <button @click="submitSearch">Cari (Enter)</button>
+                <button @click="resetSearch">Reset (Esc)</button>
+
+                <div v-if="searchResult" style="margin-top: 20px; background: #fff; padding: 15px; border: 1px solid #bce8f1;">
+                    <h3>DO: <span style="color: blue;">{{ searchKey }}</span></h3>
+                    <p><b>NIM:</b> {{ searchResult.nim }} | <b>Nama:</b> {{ searchResult.nama }}</p>
+                    <p><b>Ekspedisi:</b> {{ searchResult.ekspedisi }} | <b>Tgl Kirim:</b> {{ formatDateDisplay(searchResult.tanggalKirim) }}</p>
+                    <p><b>Paket:</b> {{ searchResult.paket }} | <b>Total:</b> {{ searchResult.total | currency }}</p>
+                    <hr>
+                    <h4>Progress Perjalanan</h4>
+                    <input type="text" v-model="formProgress.keterangan" placeholder="Update perjalanan..." @keyup.enter="addProgress" style="width: 300px; padding: 5px;">
+                    <button @click="addProgress">Update (Enter)</button>
+                    <ul><li v-for="log in searchResult.perjalanan" :key="log.waktu">[{{ log.waktu }}] - <b>{{ log.keterangan }}</b></li></ul>
+                </div>
+            </div>
+
+            <div style="padding: 15px; border: 1px solid #ccc; background: #fafafa;">
+                <h3>Buat DO Baru</h3>
+                <form @submit.prevent="submitDO">
+                    <input type="text" v-model="formDO.nim" placeholder="NIM" required>
+                    <input type="text" v-model="formDO.nama" placeholder="Nama" required>
+                    <select v-model="formDO.ekspedisi" required><option value="">-- Ekspedisi --</option><option v-for="eks in ekspedisiList" :value="eks.nama">{{ eks.nama }}</option></select>
+                    <select v-model="formDO.paket" required><option value="">-- Paket --</option><option v-for="pkt in paketList" :value="pkt.kode">{{ pkt.kode }} - {{ pkt.nama }}</option></select>
+                    <div v-if="selectedPaketDetail" style="margin: 10px 0; padding: 10px; background: #fff; border: 1px dashed #999;">
+                        <b>Isi:</b> {{ selectedPaketDetail.isi.join(', ') }} | <b>Harga:</b> {{ selectedPaketDetail.harga | currency }}
+                    </div>
+                    <input type="date" v-model="formDO.tanggalKirim" required>
+                    <button type="submit">Simpan DO Baru</button>
+                </form>
+            </div>
+        </div>
+    </template>
+
+    <!-- Template 3: Form Pemesanan -->
+    <template id="tpl-order">
+        <div class="order-container">
+            <h2>Formulir Pemesanan Bahan Ajar</h2>
+            <div style="padding: 20px; border: 1px solid #ccc; background: #fdfdfd; max-width: 500px;">
+                <form @submit.prevent="submitOrder">
+                    <div style="margin-bottom: 10px;"><label>NIM:</label><input type="text" v-model="form.nim" style="width: 100%;"></div>
+                    <div style="margin-bottom: 10px;"><label>Nama:</label><input type="text" v-model="form.nama" style="width: 100%;"></div>
+                    <div style="margin-bottom: 10px;">
+                        <label>Ekspedisi:</label>
+                        <select v-model="form.ekspedisi" style="width: 100%;">
+                            <option value="">-- Pilih --</option>
+                            <option v-for="eks in ekspedisiList" :value="eks.nama">{{ eks.nama }}</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label>Paket:</label>
+                        <select v-model="form.paket" style="width: 100%;">
+                            <option value="">-- Pilih --</option>
+                            <option v-for="pkt in paketList" :value="pkt.kode">{{ pkt.nama }}</option>
+                        </select>
+                    </div>
+                    <button type="submit" style="width: 100%; padding: 10px; background: #28a745; color: white; border: none; cursor: pointer;">Pesan Sekarang</button>
+                </form>
+            </div>
+        </div>
+    </template>
+
+    <!-- Template 4: Pop-up Modal -->
+    <template id="tpl-modal">
+        <div v-show="isVisible" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 999; display: flex; justify-content: center; align-items: center;">
+            <div style="background: white; padding: 20px; border-radius: 8px; min-width: 300px; text-align: center;">
+                <h3>{{ title }}</h3>
+                <p>{{ message }}</p>
+                <button @click="close" style="padding: 8px 20px; background: #007bff; color: white; border: none; cursor: pointer;">Tutup</button>
+            </div>
+        </div>
+    </template>
+
+    <!-- ========================================== -->
+    <!-- SCRIPTS (URUTAN SANGAT PENTING)            -->
+    <!-- ========================================== -->
+    
+    <!-- 1. Vue Framework -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+    
+    <!-- 2. Services (Data API) -->
+    <script src="./js/services/api.js"></script>
+    
+    <!-- 3. Components (Bagian-bagian Aplikasi) -->
+    <script src="./js/components/stock-table.js"></script>
+    <script src="./js/components/do-tracking.js"></script>
+    <script src="./js/components/order-form.js"></script>
+    <script src="./js/components/app-modal.js"></script>
+    
+    <!-- 4. Root Instance (Pusat Kendali Utama) -->
+    <script src="./js/app.js"></script>
+
+</body>
+</html>
